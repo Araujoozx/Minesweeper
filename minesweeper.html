@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minesweeper</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(10, 40px);
+            gap: 2px;
+            margin: 20px auto;
+            width: fit-content;
+        }
+        .cell {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: lightgray;
+            border: 1px solid black;
+            cursor: pointer;
+            font-weight: bold;
+            background-size: cover;
+        }
+        .cell.revealed {
+            background-color: white;
+            cursor: default;
+        }
+        .cell.mine {
+            background-image: url('https://cdn.discordapp.com/attachments/1155251561866473593/1338577086952247316/mine.png?ex=67ab968f&is=67aa450f&hm=2301281afdedeeb60e86fd553d7b00b476de6899089901b7033241d842c4873a&'); /* Ícone de mina */
+        }
+        .cell.flag {
+            background-image: url('https://cdn.discordapp.com/attachments/1155251561866473593/1338577086683545671/flag.png?ex=67ab968f&is=67aa450f&hm=345421124fad525c0807a377378070c85a70bffb3ee52b667c4e1c6f25caf289&'); /* Ícone de bandeira */
+        }
+        .instructions {
+            margin-top: 10px;
+            font-size: 16px;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            display: inline-block;
+        }
+        .credits {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            font-size: 14px;
+            color: gray;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.0.0"></script>
+</head>
+<body>
+    <h1>Minesweeper Game</h1>
+    <div class="instructions">
+        <p>🖱 Clique esquerdo: Revela a célula</p>
+        <p>🚩 Clique direito: Marca/Desmarca a célula com uma bandeira</p>
+    </div>
+    <div id="gameBoard" class="grid"></div>
+    <div class="credits">Programado por Araujo e desenhado por Ana Souza</div>
+    <script>
+        const rows = 10;
+        const cols = 10;
+        const minesCount = 15;
+        let board = [];
+
+        function createBoard() {
+            let boardElement = document.getElementById("gameBoard");
+            boardElement.innerHTML = "";
+            boardElement.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
+            
+            let minePositions = new Set();
+            while (minePositions.size < minesCount) {
+                let pos = Math.floor(Math.random() * rows * cols);
+                minePositions.add(pos);
+            }
+            
+            for (let i = 0; i < rows; i++) {
+                board[i] = [];
+                for (let j = 0; j < cols; j++) {
+                    let cell = document.createElement("div");
+                    cell.classList.add("cell");
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    
+                    let isMine = minePositions.has(i * cols + j);
+                    board[i][j] = { element: cell, isMine, revealed: false, flagged: false };
+                    
+                    cell.addEventListener("click", () => {
+                        revealCell(i, j);
+                        checkWin();
+                    });
+                    cell.addEventListener("contextmenu", (e) => toggleFlag(e, i, j));
+                    
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        function revealCell(row, col) {
+            let cell = board[row][col];
+            if (cell.revealed || cell.flagged) return;
+            
+            cell.revealed = true;
+            cell.element.classList.add("revealed");
+            
+            if (cell.isMine) {
+                cell.element.classList.add("mine");
+                alert("Game Over! Você pisou em uma mina!");
+                return;
+            }
+            
+            let minesAround = countMines(row, col);
+            if (minesAround > 0) {
+                cell.element.innerText = minesAround;
+            } else {
+                revealSurrounding(row, col);
+            }
+        }
+
+        function countMines(row, col) {
+            let count = 0;
+            for (let i = -1; i <= 1; i++) {
+                for (let j = -1; j <= 1; j++) {
+                    let newRow = row + i;
+                    let newCol = col + j;
+                    if (newRow >= 0 && newRow < rows && newCol >= 0 && newCol < cols) {
+                        if (board[newRow][newCol].isMine) count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        function revealSurrounding(row, col) {
+            for (let i = -1; i <= 1; i++) {
+                for (let j = -1; j <= 1; j++) {
+                    let newRow = row + i;
+                    let newCol = col + j;
+                    if (newRow >= 0 && newRow < rows && newCol >= 0 && newCol < cols) {
+                        revealCell(newRow, newCol);
+                    }
+                }
+            }
+        }
+
+        function toggleFlag(event, row, col) {
+            event.preventDefault(); // Evita o menu de contexto padrão
+            let cell = board[row][col];
+            if (cell.revealed) return;
+            
+            cell.flagged = !cell.flagged;
+            cell.element.classList.toggle("flag", cell.flagged);
+            checkWin();
+        }
+
+        function checkWin() {
+            let revealedCells = 0;
+            let correctlyFlagged = 0;
+            
+            board.flat().forEach(cell => {
+                if (cell.revealed) revealedCells++;
+                if (cell.flagged && cell.isMine) correctlyFlagged++;
+            });
+            
+            if (revealedCells + minesCount === rows * cols && correctlyFlagged === minesCount) {
+                celebrateWin();
+            }
+        }
+
+        function celebrateWin() {
+            alert("Parabéns! Você venceu!");
+            confetti();
+        }
+
+        createBoard();
+    </script>
+</body>
+</html>
