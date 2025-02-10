@@ -1,1 +1,3 @@
 # Minesweeper
+
+Just an old minesweeper game made by me...
